@@ -25,6 +25,7 @@
     "@medusajs/admin-sdk": "2.11.1",
     "@medusajs/cli": "2.11.1",
     "@medusajs/framework": "2.11.1",
+    "@medusajs/icons": "^2.11.1",
     "@medusajs/medusa": "2.11.1"
   },
   "devDependencies": {

@@ -15,19 +15,13 @@ export async function POST(
   res: MedusaResponse
 ): Promise<void> {
   try {
-    // Check for setup secret (case-insensitive header check)
+    // Check for setup secret (try header first, then query param)
     const setupSecret = process.env.ADMIN_SETUP_SECRET || "change-this-secret"
-    const providedSecret = (req.headers["x-setup-secret"] || req.headers["X-Setup-Secret"]) as string
-
-    console.log("Setup secret check:", { 
-      expected: setupSecret, 
-      provided: providedSecret,
-      headers: Object.keys(req.headers)
-    })
+    const providedSecret = (req.headers["x-setup-secret"] || req.headers["X-Setup-Secret"] || req.query?.secret) as string
 
     if (!providedSecret || providedSecret !== setupSecret) {
       res.status(401).json({
-        message: "Unauthorized. Provide x-setup-secret header with value: " + setupSecret,
+        message: "Unauthorized. Provide x-setup-secret header or ?secret= query param with value: " + setupSecret,
       })
       return
     }

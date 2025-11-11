@@ -71,8 +71,11 @@ export async function POST(
     // Create auth identity with password
     await authModule.createAuthIdentities({
       entity_id: users[0].id,
+      provider: "emailpass",
       provider_metadata: {
         password: password,
+      },
+      user_metadata: {
         is_admin: true,
       },
     })

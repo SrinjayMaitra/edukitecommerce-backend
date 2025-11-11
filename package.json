@@ -13,7 +13,7 @@
     "medusa"
   ],
   "scripts": {
-    "build": "medusa build && (cp -r .medusa/server/public public 2>/dev/null || mkdir -p public && cp -r .medusa/server/public/* public/ 2>/dev/null || echo 'Admin files copy attempted')",
+    "build": "medusa build && (test -d .medusa/server/public && mkdir -p public && cp -r .medusa/server/public/* public/ || echo 'Admin build files not found in expected location')",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "start": "medusa start",
     "dev": "medusa develop",

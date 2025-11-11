@@ -60,7 +60,7 @@ export async function POST(
 
     // Check if an auth identity already exists for this user
     // Try to list all auth identities and find the one for this user
-    let existingAuthIdentityId = null
+    let existingAuthIdentityId: string | null = null
     try {
       // List all auth identities and filter manually
       const allAuthIdentities = await authModule.listAuthIdentities({})

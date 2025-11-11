@@ -89,7 +89,7 @@ export async function POST(
     // Create new auth identity with password
     // Note: Using 'as any' to bypass TypeScript issues with Medusa v2 API
     try {
-      await (authModule.createAuthIdentities as any)([
+      const result = await (authModule.createAuthIdentities as any)([
         {
           entity_id: userId,
           provider: "emailpass",
@@ -101,16 +101,29 @@ export async function POST(
           },
         },
       ])
+      console.log("Auth identity created successfully:", result)
     } catch (createError: any) {
-      // If creation fails, try alternative approach
-      console.error("Error creating auth identity:", createError)
+      // If creation fails, log the full error for debugging
+      console.error("Error creating auth identity - Full error:", JSON.stringify(createError, null, 2))
+      console.error("Error creating auth identity - Message:", createError?.message)
+      console.error("Error creating auth identity - Stack:", createError?.stack)
       throw new Error(`Failed to set password: ${createError?.message || createError}`)
+    }
+
+    // Verify the auth identity was created
+    try {
+      const verifyAuth = await authModule.listAuthIdentities({})
+      const userAuth = verifyAuth?.find((auth: any) => auth.entity_id === userId && auth.provider === "emailpass")
+      console.log("Verification - Auth identity exists:", !!userAuth)
+    } catch (verifyError) {
+      console.warn("Could not verify auth identity:", verifyError)
     }
 
     res.json({
       message: "Admin password set successfully! You can now log in.",
       email: email,
       id: userId,
+      note: "If login still fails, check Railway logs for errors.",
     })
   } catch (error: any) {
     console.error("Error setting admin password:", error)

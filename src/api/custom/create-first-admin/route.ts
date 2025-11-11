@@ -47,11 +47,32 @@ export async function POST(
       },
     })
 
+    // If user exists, delete it and recreate (for testing)
     if (existingUsersResult && existingUsersResult.data && existingUsersResult.data.length > 0) {
-      res.status(400).json({
-        message: `User with email ${email} already exists`,
-      })
-      return
+      const existingUserId = existingUsersResult.data[0].id
+      console.log("User exists, deleting and recreating...")
+      
+      // Delete existing auth identities
+      const authModule = req.scope.resolve(Modules.AUTH)
+      try {
+        const allAuthIdentities = await authModule.listAuthIdentities({})
+        const userAuthIdentity = allAuthIdentities?.find(
+          (auth: any) => auth.entity_id === existingUserId
+        )
+        if (userAuthIdentity) {
+          await authModule.deleteAuthIdentities([userAuthIdentity.id])
+        }
+      } catch (error) {
+        console.warn("Could not delete auth identity:", error)
+      }
+      
+      // Delete the user
+      const userModule = req.scope.resolve(Modules.USER)
+      try {
+        await userModule.deleteUsers([existingUserId])
+      } catch (error) {
+        console.warn("Could not delete user:", error)
+      }
     }
 
     // Create admin user using workflow

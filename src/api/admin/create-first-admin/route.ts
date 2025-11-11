@@ -16,27 +16,15 @@ export async function POST(
   res: MedusaResponse
 ): Promise<void> {
   try {
-    // TEMPORARILY DISABLED: Secret check for easier setup
-    // TODO: Re-enable after first admin user is created
-    // Check for setup secret (try header first, then query param)
-    const setupSecret = process.env.ADMIN_SETUP_SECRET || "change-this-secret"
-    
-    // Try multiple ways to get the secret
-    const headerSecret = req.headers["x-setup-secret"] || req.headers["X-Setup-Secret"]
-    const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`)
-    const querySecret = url.searchParams.get("secret")
-    const providedSecret = headerSecret || querySecret
-
-    // TEMPORARILY: Allow if no secret provided (for initial setup only)
-    // Remove this after creating first admin user!
-    const skipAuth = !providedSecret && process.env.NODE_ENV === "production"
-    
-    if (!skipAuth && (!providedSecret || providedSecret !== setupSecret)) {
-      res.status(401).json({
-        message: "Unauthorized. Provide x-setup-secret header or ?secret= query param. Expected: " + setupSecret + ", Got: " + (providedSecret || "nothing"),
-      })
-      return
-    }
+    // TEMPORARILY DISABLED: Secret check for initial setup
+    // TODO: Re-enable security after first admin user is created
+    // For now, allow creation without secret to get started
+    // const setupSecret = process.env.ADMIN_SETUP_SECRET || "change-this-secret"
+    // const providedSecret = req.headers["x-setup-secret"] || req.query?.secret
+    // if (!providedSecret || providedSecret !== setupSecret) {
+    //   res.status(401).json({ message: "Unauthorized" })
+    //   return
+    // }
 
     const { email, password } = req.body as { email?: string; password?: string }
 

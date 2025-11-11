@@ -18,26 +18,5 @@ module.exports = defineConfig({
     {
       resolve: "./src/modules/subscription",
     },
-    {
-      resolve: "@medusajs/event-bus-redis",
-      key: "eventBusService",
-      options: {
-        redisUrl: process.env.REDIS_URL,
-      },
-    },
-    {
-      resolve: "@medusajs/cache-redis",
-      key: "cacheService",
-      options: {
-        redisUrl: process.env.REDIS_URL,
-      },
-    },
-    {
-      resolve: "@medusajs/locking-redis",
-      key: "lockingService",
-      options: {
-        redisUrl: process.env.REDIS_URL,
-      },
-    },
   ],
 })

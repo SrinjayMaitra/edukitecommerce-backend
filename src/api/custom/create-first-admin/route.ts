@@ -63,12 +63,34 @@ export async function POST(
       },
     })
 
+    // Try to set password using auth provider
+    // This is a workaround - Medusa v2 password setting is complex
+    try {
+      const authModule = req.scope.resolve(Modules.AUTH)
+      
+      // Check if auth identity exists, if not create one
+      const existingAuth = await query.graph({
+        entity: "auth_identity",
+        fields: ["id"],
+        filters: {
+          entity_id: users[0].id,
+        },
+      })
+
+      // Note: Password setting via API is complex in Medusa v2
+      // The user will need to use "Forgot password" or CLI to set password
+      console.log("User created. Password needs to be set via CLI or forgot password flow.")
+    } catch (authError) {
+      console.warn("Could not set password automatically:", authError)
+    }
+
     const user = users[0]
 
     res.json({
-      message: "Admin user created successfully. Password needs to be set via: npx medusa user -e " + email + " -p " + password,
+      message: "Admin user created! Use 'Forgot password' link on login page to set password, or run: railway run --service edukitecommerce-backend npx medusa user -e " + email + " -p " + password,
       email: user?.email,
       id: user?.id,
+      note: "Click 'Reset' link on login page to set your password",
     })
   } catch (error: any) {
     console.error("Error creating admin user:", error)

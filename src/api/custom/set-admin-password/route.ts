@@ -100,19 +100,18 @@ export async function POST(
         }
       }
 
-      // Hash password using bcrypt (same method Medusa uses)
-      // Medusa's emailpass provider stores hashed passwords
-      const saltRounds = 10
-      const hashedPassword = await bcrypt.hash(password, saltRounds)
-      console.log("Password hashed with bcrypt")
+      // IMPORTANT: Store password in PLAIN TEXT
+      // Medusa's emailpass provider will hash it automatically during authentication
+      // If we hash it ourselves, Medusa will hash it again, causing a mismatch
+      console.log("Creating auth identity with plain text password (Medusa will hash it)")
       
-      // Create auth identity with hashed password
+      // Create auth identity with plain text password
       const createResult = await (authModule.createAuthIdentities as any)([
         {
           entity_id: userId,
           provider: "emailpass",
           provider_metadata: {
-            password: hashedPassword,
+            password: password, // Plain text - Medusa hashes it during auth
           },
           user_metadata: {
             is_admin: true,

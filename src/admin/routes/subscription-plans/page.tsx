@@ -316,6 +316,11 @@ const SubscriptionPlansPage = () => {
                   <option value="Class 5" className="bg-gray-800 text-white">Class 5</option>
                   <option value="Class 6" className="bg-gray-800 text-white">Class 6</option>
                   <option value="Class 7" className="bg-gray-800 text-white">Class 7</option>
+                  <option value="Class 8" className="bg-gray-800 text-white">Class 8</option>
+                  <option value="Class 9" className="bg-gray-800 text-white">Class 9</option>
+                  <option value="Class 10" className="bg-gray-800 text-white">Class 10</option>
+                  <option value="Class 11" className="bg-gray-800 text-white">Class 11</option>
+                  <option value="Class 12" className="bg-gray-800 text-white">Class 12</option>
                 </select>
               </div>
 
@@ -477,6 +482,11 @@ const SubscriptionPlansPage = () => {
                   <option value="Class 5" className="bg-gray-800 text-white">Class 5</option>
                   <option value="Class 6" className="bg-gray-800 text-white">Class 6</option>
                   <option value="Class 7" className="bg-gray-800 text-white">Class 7</option>
+                  <option value="Class 8" className="bg-gray-800 text-white">Class 8</option>
+                  <option value="Class 9" className="bg-gray-800 text-white">Class 9</option>
+                  <option value="Class 10" className="bg-gray-800 text-white">Class 10</option>
+                  <option value="Class 11" className="bg-gray-800 text-white">Class 11</option>
+                  <option value="Class 12" className="bg-gray-800 text-white">Class 12</option>
                 </select>
               </div>
 

@@ -36,22 +36,24 @@ export async function POST(
       SUBSCRIPTION_MODULE
     )
 
+    const body = req.body as any
+
     // Validate required fields
-    if (!req.body.name) {
+    if (!body.name) {
       res.status(400).json({
         message: "Plan name is required",
       })
       return
     }
 
-    if (!req.body.monthly_price || isNaN(parseFloat(req.body.monthly_price))) {
+    if (!body.monthly_price || isNaN(parseFloat(body.monthly_price))) {
       res.status(400).json({
         message: "Valid monthly price is required",
       })
       return
     }
 
-    const plan = await subscriptionService.createPlan(req.body as any)
+    const plan = await subscriptionService.createPlan(body)
 
     res.json({
       subscription_plan: plan,

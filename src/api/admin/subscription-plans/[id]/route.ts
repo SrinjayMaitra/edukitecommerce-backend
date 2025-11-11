@@ -36,16 +36,17 @@ export async function POST(
     )
 
     const { id } = req.params
+    const body = req.body as any
 
     // Validate required fields if provided
-    if (req.body.monthly_price !== undefined && isNaN(parseFloat(req.body.monthly_price))) {
+    if (body.monthly_price !== undefined && isNaN(parseFloat(body.monthly_price))) {
       res.status(400).json({
         message: "Valid monthly price is required",
       })
       return
     }
 
-    const plan = await subscriptionService.updatePlan(id, req.body as any)
+    const plan = await subscriptionService.updatePlan(id, body)
 
     res.json({
       subscription_plan: plan,

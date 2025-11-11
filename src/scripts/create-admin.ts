@@ -1,6 +1,6 @@
 import { ExecArgs } from "@medusajs/framework/types"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { createAuthUsersWorkflow } from "@medusajs/medusa/core-flows"
+import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
 
 export default async function createAdminUser({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
@@ -13,19 +13,26 @@ export default async function createAdminUser({ container }: ExecArgs) {
     logger.info(`Creating admin user with email: ${email}`)
 
     // Create admin user using Medusa workflow
-    const { result } = await createAuthUsersWorkflow(container).run({
+    const { result: users } = await createUsersWorkflow(container).run({
       input: {
-        auth_users: [
+        users: [
           {
             email,
             password,
-            provider_metadata: {
-              is_admin: true,
-            },
           },
         ],
       },
     })
+
+    // Make the user an admin
+    const userModule = container.resolve(Modules.USER)
+    await userModule.updateUsers(users[0].id, {
+      metadata: {
+        is_admin: true,
+      },
+    })
+
+    const result = users
 
     logger.info(`Admin user created successfully!`)
     logger.info(`Email: ${email}`)

@@ -1,5 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { Modules } from "@medusajs/framework/utils"
+import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
 
 /**
  * One-time endpoint to create the first admin user
@@ -36,9 +37,13 @@ export async function POST(
     }
 
     // Check if any admin users already exist
-    const authModule = req.scope.resolve(Modules.AUTH)
-    const existingUsers = await authModule.listAuthUsers({
-      email,
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const existingUsers = await query.graph({
+      entity: "user",
+      fields: ["id", "email"],
+      filters: {
+        email: email,
+      },
     })
 
     if (existingUsers && existingUsers.length > 0) {
@@ -48,19 +53,32 @@ export async function POST(
       return
     }
 
-    // Create admin user
-    const user = await authModule.createAuthUsers({
-      email,
-      password,
-      provider_metadata: {
+    // Create admin user using workflow
+    const { result: users } = await createUsersWorkflow(req.scope).run({
+      input: {
+        users: [
+          {
+            email,
+            password,
+          },
+        ],
+      },
+    })
+
+    // Make the user an admin
+    const userModule = req.scope.resolve(Modules.USER)
+    await userModule.updateUsers(users[0].id, {
+      metadata: {
         is_admin: true,
       },
     })
 
+    const user = users[0]
+
     res.json({
       message: "Admin user created successfully",
-      email: user[0]?.email,
-      id: user[0]?.id,
+      email: user?.email,
+      id: user?.id,
     })
   } catch (error: any) {
     console.error("Error creating admin user:", error)

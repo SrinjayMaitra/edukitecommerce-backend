@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { createUsersWorkflow, createAuthIdentitiesWorkflow } from "@medusajs/medusa/core-flows"
+import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
 
 /**
  * One-time endpoint to create the first admin user
@@ -63,25 +63,24 @@ export async function POST(
       },
     })
 
-    // Set password using createAuthIdentitiesWorkflow
+    // Set password using auth module directly
     try {
-      await createAuthIdentitiesWorkflow(req.scope).run({
-        input: {
-          auth_identities: [
-            {
-              entity_id: users[0].id,
-              provider: "emailpass",
-              provider_metadata: {
-                password: password,
-              },
-              user_metadata: {
-                is_admin: true,
-              },
-            },
-          ],
+      const authModule = req.scope.resolve(Modules.AUTH)
+      
+      // Create auth identity with password
+      await authModule.createAuthIdentities([
+        {
+          entity_id: users[0].id,
+          provider: "emailpass",
+          provider_metadata: {
+            password: password,
+          },
+          user_metadata: {
+            is_admin: true,
+          },
         },
-      })
-      console.log("Password set successfully via workflow")
+      ])
+      console.log("Password set successfully")
     } catch (authError: any) {
       console.warn("Could not set password automatically:", authError?.message || authError)
       // Continue anyway - user can use forgot password flow

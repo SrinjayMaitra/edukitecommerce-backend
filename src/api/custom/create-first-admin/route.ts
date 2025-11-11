@@ -16,6 +16,18 @@ export async function POST(
   res: MedusaResponse
 ): Promise<void> {
   try {
+    // Check for setup secret (optional but recommended for security)
+    const setupSecret = process.env.ADMIN_SETUP_SECRET
+    if (setupSecret) {
+      const providedSecret = req.headers["x-setup-secret"] || req.query.secret
+      if (providedSecret !== setupSecret) {
+        res.status(401).json({
+          message: "Unauthorized. Provide x-setup-secret header or secret query param.",
+        })
+        return
+      }
+    }
+
     const { email, password } = req.body as { email?: string; password?: string }
 
     if (!email || !password) {

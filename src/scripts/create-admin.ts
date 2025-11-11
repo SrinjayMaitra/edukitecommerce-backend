@@ -18,15 +18,27 @@ export default async function createAdminUser({ container }: ExecArgs) {
         users: [
           {
             email,
-            password,
           },
         ],
       },
     })
 
-    // Make the user an admin
+    // Set password and make admin using auth module
+    const authModule = container.resolve(Modules.AUTH)
     const userModule = container.resolve(Modules.USER)
-    await userModule.updateUsers(users[0].id, {
+    
+    // Create auth identity with password
+    await authModule.createAuthIdentities({
+      entity_id: users[0].id,
+      provider_metadata: {
+        password: password,
+        is_admin: true,
+      },
+    })
+
+    // Update user metadata to mark as admin
+    await userModule.updateUsers({
+      id: users[0].id,
       metadata: {
         is_admin: true,
       },

@@ -38,7 +38,7 @@ export async function POST(
 
     // Check if any admin users already exist
     const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-    const existingUsers = await query.graph({
+    const existingUsersResult = await query.graph({
       entity: "user",
       fields: ["id", "email"],
       filters: {
@@ -46,7 +46,7 @@ export async function POST(
       },
     })
 
-    if (existingUsers && existingUsers.length > 0) {
+    if (existingUsersResult && existingUsersResult.data && existingUsersResult.data.length > 0) {
       res.status(400).json({
         message: `User with email ${email} already exists`,
       })
@@ -59,15 +59,27 @@ export async function POST(
         users: [
           {
             email,
-            password,
           },
         ],
       },
     })
 
-    // Make the user an admin
+    // Set password and make admin using auth module
+    const authModule = req.scope.resolve(Modules.AUTH)
     const userModule = req.scope.resolve(Modules.USER)
-    await userModule.updateUsers(users[0].id, {
+    
+    // Create auth identity with password
+    await authModule.createAuthIdentities({
+      entity_id: users[0].id,
+      provider_metadata: {
+        password: password,
+        is_admin: true,
+      },
+    })
+
+    // Update user metadata to mark as admin
+    await userModule.updateUsers({
+      id: users[0].id,
       metadata: {
         is_admin: true,
       },

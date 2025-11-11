@@ -18,11 +18,23 @@ export async function POST(
   try {
     // Check for setup secret (try header first, then query param)
     const setupSecret = process.env.ADMIN_SETUP_SECRET || "change-this-secret"
-    const providedSecret = (req.headers["x-setup-secret"] || req.headers["X-Setup-Secret"] || req.query?.secret) as string
+    
+    // Try multiple ways to get the secret
+    const headerSecret = req.headers["x-setup-secret"] || req.headers["X-Setup-Secret"]
+    const querySecret = (req.query as any)?.secret
+    const providedSecret = headerSecret || querySecret
+
+    console.log("Secret check:", { 
+      expected: setupSecret, 
+      provided: providedSecret,
+      headerSecret,
+      querySecret,
+      query: req.query
+    })
 
     if (!providedSecret || providedSecret !== setupSecret) {
       res.status(401).json({
-        message: "Unauthorized. Provide x-setup-secret header or ?secret= query param with value: " + setupSecret,
+        message: "Unauthorized. Provide x-setup-secret header or ?secret= query param. Expected: " + setupSecret + ", Got: " + (providedSecret || "nothing"),
       })
       return
     }

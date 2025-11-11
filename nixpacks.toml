@@ -5,7 +5,7 @@ nixPkgs = ["nodejs-20_x", "npm"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm run build", "ls -la .medusa/server/public 2>/dev/null || echo 'Admin build directory not found'", "find .medusa -name 'index.html' -type f 2>/dev/null | head -5 || echo 'No index.html found in .medusa'"]
 
 [start]
 cmd = "npm start"

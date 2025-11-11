@@ -63,36 +63,23 @@ export async function POST(
       },
     })
 
-    // Set password using auth module directly
-    try {
-      const authModule = req.scope.resolve(Modules.AUTH)
-      
-      // Create auth identity with password
-      await authModule.createAuthIdentities([
-        {
-          entity_id: users[0].id,
-          provider: "emailpass",
-          provider_metadata: {
-            password: password,
-          },
-          user_metadata: {
-            is_admin: true,
-          },
-        },
-      ])
-      console.log("Password set successfully")
-    } catch (authError: any) {
-      console.warn("Could not set password automatically:", authError?.message || authError)
-      // Continue anyway - user can use forgot password flow
-    }
+    // Note: Password setting is complex in Medusa v2
+    // The user will need to use the "Forgot password" link on the login page
+    // OR use Railway CLI: railway run --service edukitecommerce-backend npx medusa user -e <email> -p <password>
+    console.log(`User created. Password needs to be set via "Forgot password" link or CLI.`)
 
     const user = users[0]
 
     res.json({
-      message: "Admin user created successfully! Try logging in now.",
+      message: "Admin user created successfully!",
       email: user?.email,
       id: user?.id,
-      password_set: "Password should be set. If login fails, use 'Forgot password' link.",
+      next_steps: [
+        "1. Go to the login page: https://edukitecommerce-backend-production.up.railway.app/app",
+        "2. Click 'Reset' (Forgot password link)",
+        "3. Enter your email and follow the password reset flow",
+        "OR use Railway CLI: railway run --service edukitecommerce-backend npx medusa user -e " + email + " -p " + password,
+      ],
     })
   } catch (error: any) {
     console.error("Error creating admin user:", error)

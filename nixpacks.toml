@@ -5,7 +5,7 @@ nixPkgs = ["nodejs-20_x", "npm"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npm run build", "ls -la .medusa/server/public 2>/dev/null || echo 'Checking admin build...'", "ls -la public 2>/dev/null || echo 'Public directory check...'"]
+cmds = ["npm run build", "echo '=== Checking admin build output ==='", "find .medusa -name 'index.html' -type f 2>/dev/null | head -3 || echo 'No index.html found'", "ls -la .medusa/server/public/ 2>/dev/null | head -10 || echo 'Admin public dir not found'", "ls -la public/ 2>/dev/null | head -10 || echo 'Public dir not found'"]
 
 [start]
 cmd = "npm start"

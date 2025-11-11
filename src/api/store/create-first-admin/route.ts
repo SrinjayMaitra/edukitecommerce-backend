@@ -4,11 +4,11 @@ import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
 
 /**
  * One-time endpoint to create the first admin user
- * Protected by ADMIN_SETUP_SECRET environment variable
+ * TEMPORARILY: No authentication required for initial setup
+ * TODO: Re-enable security after first admin user is created
  * 
  * Usage:
- * POST /admin/create-first-admin
- * Headers: { "x-setup-secret": "your-secret" }
+ * POST /store/create-first-admin
  * Body: { "email": "admin@example.com", "password": "secure-password" }
  */
 export async function POST(
@@ -16,16 +16,6 @@ export async function POST(
   res: MedusaResponse
 ): Promise<void> {
   try {
-    // TEMPORARILY DISABLED: Secret check for initial setup
-    // TODO: Re-enable security after first admin user is created
-    // For now, allow creation without secret to get started
-    // const setupSecret = process.env.ADMIN_SETUP_SECRET || "change-this-secret"
-    // const providedSecret = req.headers["x-setup-secret"] || req.query?.secret
-    // if (!providedSecret || providedSecret !== setupSecret) {
-    //   res.status(401).json({ message: "Unauthorized" })
-    //   return
-    // }
-
     const { email, password } = req.body as { email?: string; password?: string }
 
     if (!email || !password) {
@@ -64,7 +54,7 @@ export async function POST(
     })
 
     // For now, just mark user as admin
-    // Password will need to be set via Medusa CLI or admin panel
+    // Password will need to be set via Medusa CLI
     const userModule = req.scope.resolve(Modules.USER)
     
     // Update user metadata to mark as admin
@@ -82,7 +72,7 @@ export async function POST(
     const user = users[0]
 
     res.json({
-      message: "Admin user created successfully",
+      message: "Admin user created successfully. Password needs to be set via: npx medusa user -e " + email + " -p " + password,
       email: user?.email,
       id: user?.id,
     })
@@ -94,4 +84,3 @@ export async function POST(
     })
   }
 }
-

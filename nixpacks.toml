@@ -5,7 +5,7 @@ nixPkgs = ["nodejs-20_x", "npm"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm run build", "ls -la .medusa/server/public 2>/dev/null || echo 'Checking admin build...'", "ls -la public 2>/dev/null || echo 'Public directory check...'"]
 
 [start]
 cmd = "npm start"

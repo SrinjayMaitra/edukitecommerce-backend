@@ -1,5 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import * as bcrypt from "bcryptjs"
 
 /**
  * Public endpoint to set/update password for an existing admin user.
@@ -99,14 +100,19 @@ export async function POST(
         }
       }
 
-      // Create auth identity with password directly
-      // The password should be automatically hashed by the emailpass provider
+      // Hash the password manually using bcrypt
+      // Medusa's emailpass provider expects the password to be hashed
+      const saltRounds = 10
+      const hashedPassword = await bcrypt.hash(password, saltRounds)
+      console.log("Password hashed successfully")
+      
+      // Create auth identity with hashed password
       const createResult = await (authModule.createAuthIdentities as any)([
         {
           entity_id: userId,
           provider: "emailpass",
           provider_metadata: {
-            password: password,
+            password: hashedPassword,
           },
           user_metadata: {
             is_admin: true,

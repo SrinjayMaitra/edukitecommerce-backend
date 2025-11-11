@@ -4,11 +4,11 @@ import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
 
 /**
  * One-time endpoint to create the first admin user
- * TEMPORARILY: No authentication required for initial setup
- * TODO: Re-enable security after first admin user is created
+ * Public route - no authentication required
+ * TODO: Delete this endpoint after creating first admin user for security
  * 
  * Usage:
- * POST /store/create-first-admin
+ * POST /custom/create-first-admin
  * Body: { "email": "admin@example.com", "password": "secure-password" }
  */
 export async function POST(
@@ -53,21 +53,15 @@ export async function POST(
       },
     })
 
-    // For now, just mark user as admin
-    // Password will need to be set via Medusa CLI
+    // Mark user as admin
     const userModule = req.scope.resolve(Modules.USER)
     
-    // Update user metadata to mark as admin
     await userModule.updateUsers({
       id: users[0].id,
       metadata: {
         is_admin: true,
       },
     })
-    
-    // Note: Password needs to be set separately via:
-    // npx medusa user -e <email> -p <password>
-    // Or use the admin panel to set password
 
     const user = users[0]
 
@@ -84,3 +78,4 @@ export async function POST(
     })
   }
 }
+

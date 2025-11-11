@@ -87,51 +87,39 @@ export async function POST(
     }
 
     // Create new auth identity with password
-    // Try using the auth provider's createCredentials method which should handle password hashing
+    // The emailpass provider should hash the password automatically when provided in provider_metadata
     try {
-      // First, try to create the auth identity
+      // Delete any existing auth identity first
+      if (existingAuthIdentityId) {
+        try {
+          await authModule.deleteAuthIdentities([existingAuthIdentityId])
+          console.log("Deleted existing auth identity")
+        } catch (deleteError) {
+          console.warn("Could not delete existing auth identity:", deleteError)
+        }
+      }
+
+      // Create auth identity with password directly
+      // The password should be automatically hashed by the emailpass provider
       const createResult = await (authModule.createAuthIdentities as any)([
         {
           entity_id: userId,
           provider: "emailpass",
+          provider_metadata: {
+            password: password,
+          },
           user_metadata: {
             is_admin: true,
           },
         },
       ])
-      console.log("Auth identity created:", createResult)
+      console.log("Auth identity created with password:", createResult)
       
-      // Then, set the password using the provider's credential creation
-      // The emailpass provider should hash the password automatically
-      if (createResult && createResult.length > 0) {
-        const authIdentityId = createResult[0].id
-        
-        // Try to update with password using provider_metadata
-        // Note: This might need to be done through the provider's specific method
-        try {
-          await (authModule.updateAuthIdentities as any)(authIdentityId, {
-            provider_metadata: {
-              password: password,
-            },
-          })
-          console.log("Password set via updateAuthIdentities")
-        } catch (updateError) {
-          // If update doesn't work, try recreating with password
-          console.warn("Update failed, trying recreate with password:", updateError)
-          await authModule.deleteAuthIdentities([authIdentityId])
-          await (authModule.createAuthIdentities as any)([
-            {
-              entity_id: userId,
-              provider: "emailpass",
-              provider_metadata: {
-                password: password,
-              },
-              user_metadata: {
-                is_admin: true,
-              },
-            },
-          ])
-          console.log("Auth identity recreated with password")
+      // Verify the result structure
+      if (createResult) {
+        const resultArray = Array.isArray(createResult) ? createResult : [createResult]
+        if (resultArray.length > 0 && resultArray[0].id) {
+          console.log("Auth identity ID:", resultArray[0].id)
         }
       }
     } catch (createError: any) {

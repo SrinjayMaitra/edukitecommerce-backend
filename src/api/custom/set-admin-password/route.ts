@@ -87,21 +87,53 @@ export async function POST(
     }
 
     // Create new auth identity with password
-    // Note: Using 'as any' to bypass TypeScript issues with Medusa v2 API
+    // Try using the auth provider's createCredentials method which should handle password hashing
     try {
-      const result = await (authModule.createAuthIdentities as any)([
+      // First, try to create the auth identity
+      const createResult = await (authModule.createAuthIdentities as any)([
         {
           entity_id: userId,
           provider: "emailpass",
-          provider_metadata: {
-            password: password,
-          },
           user_metadata: {
             is_admin: true,
           },
         },
       ])
-      console.log("Auth identity created successfully:", result)
+      console.log("Auth identity created:", createResult)
+      
+      // Then, set the password using the provider's credential creation
+      // The emailpass provider should hash the password automatically
+      if (createResult && createResult.length > 0) {
+        const authIdentityId = createResult[0].id
+        
+        // Try to update with password using provider_metadata
+        // Note: This might need to be done through the provider's specific method
+        try {
+          await (authModule.updateAuthIdentities as any)(authIdentityId, {
+            provider_metadata: {
+              password: password,
+            },
+          })
+          console.log("Password set via updateAuthIdentities")
+        } catch (updateError) {
+          // If update doesn't work, try recreating with password
+          console.warn("Update failed, trying recreate with password:", updateError)
+          await authModule.deleteAuthIdentities([authIdentityId])
+          await (authModule.createAuthIdentities as any)([
+            {
+              entity_id: userId,
+              provider: "emailpass",
+              provider_metadata: {
+                password: password,
+              },
+              user_metadata: {
+                is_admin: true,
+              },
+            },
+          ])
+          console.log("Auth identity recreated with password")
+        }
+      }
     } catch (createError: any) {
       // If creation fails, log the full error for debugging
       console.error("Error creating auth identity - Full error:", JSON.stringify(createError, null, 2))

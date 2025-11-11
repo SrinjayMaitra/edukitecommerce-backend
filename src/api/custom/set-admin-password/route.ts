@@ -59,20 +59,28 @@ export async function POST(
     const userId = existingUsersResult.data[0].id
 
     // Check if an auth identity already exists for this user
-    const existingAuthIdentities = await query.graph({
-      entity: "auth_identity",
-      fields: ["id"],
-      filters: {
-        entity_id: userId,
-        provider: "emailpass",
-      },
-    })
+    // Try to list all auth identities and find the one for this user
+    let existingAuthIdentityId = null
+    try {
+      // List all auth identities and filter manually
+      const allAuthIdentities = await authModule.listAuthIdentities({})
+      if (allAuthIdentities && allAuthIdentities.length > 0) {
+        const userAuthIdentity = allAuthIdentities.find(
+          (auth: any) => auth.entity_id === userId && auth.provider === "emailpass"
+        )
+        if (userAuthIdentity) {
+          existingAuthIdentityId = userAuthIdentity.id
+        }
+      }
+    } catch (listError) {
+      console.warn("Could not list auth identities:", listError)
+      // Continue anyway - we'll try to create a new one
+    }
 
     // Delete existing auth identity if it exists (we'll recreate it with new password)
-    if (existingAuthIdentities && existingAuthIdentities.data && existingAuthIdentities.data.length > 0) {
-      const authIdentityId = existingAuthIdentities.data[0].id
+    if (existingAuthIdentityId) {
       try {
-        await authModule.deleteAuthIdentities([authIdentityId])
+        await authModule.deleteAuthIdentities([existingAuthIdentityId])
       } catch (deleteError) {
         console.warn("Could not delete existing auth identity:", deleteError)
       }

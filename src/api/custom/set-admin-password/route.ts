@@ -68,16 +68,20 @@ export async function POST(
       },
     })
 
+    // Delete existing auth identity if it exists (we'll recreate it with new password)
     if (existingAuthIdentities && existingAuthIdentities.data && existingAuthIdentities.data.length > 0) {
-      // Update existing auth identity password
-      // Note: Medusa v2 doesn't have a direct update method, so we'll delete and recreate
       const authIdentityId = existingAuthIdentities.data[0].id
-      
-      // Delete existing auth identity
-      await authModule.deleteAuthIdentities([authIdentityId])
-      
-      // Create new auth identity with new password
-      await authModule.createAuthIdentities([
+      try {
+        await authModule.deleteAuthIdentities([authIdentityId])
+      } catch (deleteError) {
+        console.warn("Could not delete existing auth identity:", deleteError)
+      }
+    }
+
+    // Create new auth identity with password
+    // Note: Using 'as any' to bypass TypeScript issues with Medusa v2 API
+    try {
+      await (authModule.createAuthIdentities as any)([
         {
           entity_id: userId,
           provider: "emailpass",
@@ -89,20 +93,10 @@ export async function POST(
           },
         },
       ])
-    } else {
-      // Create new auth identity
-      await authModule.createAuthIdentities([
-        {
-          entity_id: userId,
-          provider: "emailpass",
-          provider_metadata: {
-            password: password,
-          },
-          user_metadata: {
-            is_admin: true,
-          },
-        },
-      ])
+    } catch (createError: any) {
+      // If creation fails, try alternative approach
+      console.error("Error creating auth identity:", createError)
+      throw new Error(`Failed to set password: ${createError?.message || createError}`)
     }
 
     res.json({

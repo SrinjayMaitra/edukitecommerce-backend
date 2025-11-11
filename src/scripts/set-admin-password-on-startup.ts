@@ -46,8 +46,8 @@ export default async function setAdminPasswordOnStartup({ container }: ExecArgs)
           logger.info("Deleted existing auth identity")
         }
       }
-    } catch (error) {
-      logger.warn("Could not delete existing auth identity:", error)
+    } catch (error: any) {
+      logger.warn(`Could not delete existing auth identity: ${error?.message || error}`)
     }
 
     // Hash password with bcrypt

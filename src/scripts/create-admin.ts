@@ -23,22 +23,10 @@ export default async function createAdminUser({ container }: ExecArgs) {
       },
     })
 
-    // Set password and make admin using auth module
-    const authModule = container.resolve(Modules.AUTH)
+    // For now, just mark user as admin
+    // Password will need to be set via Medusa CLI
     const userModule = container.resolve(Modules.USER)
     
-    // Create auth identity with password
-    await authModule.createAuthIdentities({
-      entity_id: users[0].id,
-      provider: "emailpass",
-      provider_metadata: {
-        password: password,
-      },
-      user_metadata: {
-        is_admin: true,
-      },
-    })
-
     // Update user metadata to mark as admin
     await userModule.updateUsers({
       id: users[0].id,
@@ -46,6 +34,8 @@ export default async function createAdminUser({ container }: ExecArgs) {
         is_admin: true,
       },
     })
+    
+    logger.warn(`User created but password needs to be set via: npx medusa user -e ${email} -p ${password}`)
 
     const result = users
 

@@ -64,22 +64,10 @@ export async function POST(
       },
     })
 
-    // Set password and make admin using auth module
-    const authModule = req.scope.resolve(Modules.AUTH)
+    // For now, just mark user as admin
+    // Password will need to be set via Medusa CLI or admin panel
     const userModule = req.scope.resolve(Modules.USER)
     
-    // Create auth identity with password
-    await authModule.createAuthIdentities({
-      entity_id: users[0].id,
-      provider: "emailpass",
-      provider_metadata: {
-        password: password,
-      },
-      user_metadata: {
-        is_admin: true,
-      },
-    })
-
     // Update user metadata to mark as admin
     await userModule.updateUsers({
       id: users[0].id,
@@ -87,6 +75,10 @@ export async function POST(
         is_admin: true,
       },
     })
+    
+    // Note: Password needs to be set separately via:
+    // npx medusa user -e <email> -p <password>
+    // Or use the admin panel to set password
 
     const user = users[0]
 

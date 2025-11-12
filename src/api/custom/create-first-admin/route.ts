@@ -1,6 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
+import * as bcrypt from "bcryptjs"
 
 /**
  * One-time endpoint to create the first admin user
@@ -88,6 +89,7 @@ export async function POST(
 
     // Mark user as admin
     const userModule = req.scope.resolve(Modules.USER)
+    const authModule = req.scope.resolve(Modules.AUTH)
     
     await userModule.updateUsers({
       id: users[0].id,
@@ -96,22 +98,52 @@ export async function POST(
       },
     })
 
-    // Note: Password setting is complex in Medusa v2
-    // The user will need to use the "Forgot password" link on the login page
-    // OR use Railway CLI: railway run --service edukitecommerce-backend npx medusa user -e <email> -p <password>
-    console.log(`User created. Password needs to be set via "Forgot password" link or CLI.`)
+    // Delete existing auth identity if it exists
+    try {
+      const allAuthIdentities = await authModule.listAuthIdentities({})
+      if (allAuthIdentities && allAuthIdentities.length > 0) {
+        const userAuthIdentity = allAuthIdentities.find(
+          (auth: any) => auth.entity_id === users[0].id
+        )
+        if (userAuthIdentity) {
+          await authModule.deleteAuthIdentities([userAuthIdentity.id])
+          console.log("Deleted existing auth identity")
+        }
+      }
+    } catch (error) {
+      console.warn("Could not delete auth identity:", error)
+    }
+
+    // Hash password and create auth identity
+    const hashedPassword = await bcrypt.hash(password, 10)
+    await (authModule.createAuthIdentities as any)([
+      {
+        entity_id: users[0].id,
+        provider: "emailpass",
+        provider_metadata: {
+          password: hashedPassword,
+        },
+        user_metadata: {
+          is_admin: true,
+        },
+      },
+    ])
+
+    console.log(`✅ Admin user created with password!`)
 
     const user = users[0]
 
     res.json({
-      message: "Admin user created successfully!",
+      success: true,
+      message: "Admin user created successfully with password!",
       email: user?.email,
+      password: password,
       id: user?.id,
-      next_steps: [
-        "1. Go to the login page: https://edukitecommerce-backend-production.up.railway.app/app",
-        "2. Click 'Reset' (Forgot password link)",
-        "3. Enter your email and follow the password reset flow",
-        "OR use Railway CLI: railway run --service edukitecommerce-backend npx medusa user -e " + email + " -p " + password,
+      instructions: [
+        "1. Go to: /app",
+        `2. Email: ${email}`,
+        `3. Password: ${password}`,
+        "4. You can now log in!",
       ],
     })
   } catch (error: any) {

@@ -34,3 +34,4 @@ However, the seed script in this project doesn't create an admin user, so you'll
 1. Go to: `https://edukitecommerce-backend-production.up.railway.app/app`
 2. Log in with the credentials you created
 
+

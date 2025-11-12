@@ -25,9 +25,10 @@ async function ensureAdminUser(
 
   // Run in background - don't block the request
   setImmediate(async () => {
+    const container = req.scope
+    let logger: any
     try {
-      const container = req.scope
-      const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+      logger = container.resolve(ContainerRegistrationKeys.LOGGER)
       const email = process.env.ADMIN_EMAIL || "admin@medusa.com"
       const password = process.env.ADMIN_PASSWORD || "password1234"
 
@@ -120,8 +121,17 @@ async function ensureAdminUser(
       logger.info(`🔑 [Middleware] Password: ${password}`)
       logger.info(`🌐 [Middleware] Login at: /app`)
     } catch (error: any) {
-      logger.error(`❌ [Middleware] Error ensuring admin user: ${error.message}`)
-      logger.error(error.stack)
+      // Try to log error, but don't fail if logger isn't available
+      try {
+        if (!logger) {
+          logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+        }
+        logger.error(`❌ [Middleware] Error ensuring admin user: ${error.message}`)
+        logger.error(error.stack)
+      } catch {
+        console.error(`❌ [Middleware] Error ensuring admin user: ${error.message}`)
+        console.error(error.stack)
+      }
       // Reset flag so it can try again on next request
       adminSetupAttempted = false
     }

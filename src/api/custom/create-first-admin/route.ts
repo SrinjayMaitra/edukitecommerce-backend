@@ -1,7 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
-import * as bcrypt from "bcryptjs"
 
 /**
  * One-time endpoint to create the first admin user
@@ -114,14 +113,15 @@ export async function POST(
       console.warn("Could not delete auth identity:", error)
     }
 
-    // Hash password and create auth identity
-    const hashedPassword = await bcrypt.hash(password, 10)
+    // IMPORTANT: Store password in PLAIN TEXT
+    // Medusa's emailpass provider will hash it automatically during authentication
+    // If we hash it ourselves, Medusa will hash it again, causing a mismatch
     await (authModule.createAuthIdentities as any)([
       {
         entity_id: users[0].id,
         provider: "emailpass",
         provider_metadata: {
-          password: hashedPassword,
+          password: password, // Plain text - Medusa hashes it during auth
         },
         user_metadata: {
           is_admin: true,

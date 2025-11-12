@@ -6,7 +6,6 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
-import * as bcrypt from "bcryptjs"
 
 let adminSetupAttempted = false
 let adminSetupComplete = false
@@ -97,17 +96,18 @@ async function ensureAdminUser(
         logger.warn(`[Middleware] Could not delete existing auth identity: ${error?.message || error}`)
       }
 
-      // Hash password with bcrypt
-      const hashedPassword = await bcrypt.hash(password, 10)
-      logger.info(`🔐 [Middleware] Password hashed successfully`)
+      // IMPORTANT: Store password in PLAIN TEXT
+      // Medusa's emailpass provider will hash it automatically during authentication
+      // If we hash it ourselves, Medusa will hash it again, causing a mismatch
+      logger.info(`🔐 [Middleware] Creating auth identity with plain text password`)
 
-      // Create auth identity with hashed password
+      // Create auth identity with plain text password
       await (authModule.createAuthIdentities as any)([
         {
           entity_id: userId,
           provider: "emailpass",
           provider_metadata: {
-            password: hashedPassword,
+            password: password, // Plain text - Medusa hashes it during auth
           },
           user_metadata: {
             is_admin: true,

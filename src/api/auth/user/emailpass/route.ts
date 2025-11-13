@@ -19,85 +19,58 @@ export async function POST(
       return
     }
 
-    // Call Medusa's auth module directly
+    // Use Medusa's internal auth flow
+    // We need to authenticate and generate a token
+    // Since we can't easily call Medusa's internal auth endpoint,
+    // let's use a workaround: forward to Medusa but intercept response
+    
+    // Actually, let's just forward the request to Medusa's endpoint
+    // but we'll set the cookie in the response
+    // Since we're overriding the route, we need to manually handle auth
+    
+    // For now, let's use the internal HTTP approach but call a different internal endpoint
+    // Or better: use Medusa's auth module to authenticate, then generate token ourselves
+    
     const authModule = req.scope.resolve(Modules.AUTH)
     
-    // Authenticate using Medusa's auth module
-    const authResult = await (authModule.authenticate as any)(
-      "emailpass",
-      {
-        email,
-        password,
-      },
-      {
-        ip: req.ip || req.headers['x-forwarded-for'] || 'unknown',
-        userAgent: req.headers['user-agent'] || 'unknown',
-      }
-    )
-
-    if (!authResult || !authResult.authIdentity) {
-      res.status(401).json({
-        message: "Invalid email or password",
-      })
-      return
-    }
-
-    // Generate token (Medusa should do this, but let's get it from the result)
-    // Actually, we need to call the auth endpoint to get the token
-    // Let's use the internal HTTP call approach but set cookie
-    
-    const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')
-    const host = req.headers.host || req.headers['x-forwarded-host'] || 'localhost:9000'
-    const baseUrl = `${protocol}://${host}`
-
-    const http = require('http')
-    const https = require('https')
-    const url = require('url')
-
-    const authUrl = `${baseUrl}/auth/user/emailpass`
-    const parsedUrl = new url.URL(authUrl)
-    const isHttps = parsedUrl.protocol === 'https:'
-    const client = isHttps ? https : http
-
-    const postData = JSON.stringify({ email, password })
-
-    const authResponse = await new Promise<any>((resolve, reject) => {
-      const options = {
-        hostname: parsedUrl.hostname,
-        port: parsedUrl.port || (isHttps ? 443 : 80),
-        path: parsedUrl.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData)
+    try {
+      // Authenticate the user
+      const authResult = await (authModule.authenticate as any)(
+        "emailpass",
+        {
+          email,
+          password,
+        },
+        {
+          ip: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
         }
+      )
+
+      if (!authResult || !authResult.authIdentity) {
+        res.status(401).json({
+          message: "Invalid email or password",
+        })
+        return
       }
 
-      const httpReq = client.request(options, (res: any) => {
-        let data = ''
-        res.on('data', (chunk: any) => { data += chunk })
-        res.on('end', () => {
-          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-            try {
-              resolve(JSON.parse(data))
-            } catch (e) {
-              reject(new Error(`Failed to parse response: ${data}`))
-            }
-          } else {
-            reject(new Error(`Auth failed: ${res.statusCode} - ${data}`))
-          }
-        })
-      })
-
-      httpReq.on('error', (e: any) => {
-        reject(new Error(`Request failed: ${e.message}`))
-      })
-
-      httpReq.write(postData)
-      httpReq.end()
-    })
-
-    const token = authResponse.token
+      // Generate JWT token (we need to use Medusa's JWT secret)
+      const jwt = require('jsonwebtoken')
+      const jwtSecret = process.env.JWT_SECRET || "supersecret"
+      
+      const token = jwt.sign(
+        {
+          actor_id: authResult.authIdentity.entity_id,
+          actor_type: "user",
+          auth_identity_id: authResult.authIdentity.id,
+          app_metadata: {},
+          user_metadata: {},
+        },
+        jwtSecret,
+        {
+          expiresIn: "7d",
+        }
+      )
 
     if (!token) {
       res.status(401).json({

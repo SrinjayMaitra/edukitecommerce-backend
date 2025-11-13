@@ -29,15 +29,25 @@ export async function POST(
     // Find user by email
     const usersResult = await query.graph({
       entity: "user",
-      fields: ["id", "email"],
+      fields: ["id", "email", "metadata"],
       filters: {
         email: email,
       },
     })
 
+    // If not found, list all users to help debug
     if (!usersResult?.data || usersResult.data.length === 0) {
+      const allUsersResult = await query.graph({
+        entity: "user",
+        fields: ["id", "email"],
+      })
+      
+      const allEmails = allUsersResult?.data?.map((u: any) => u.email) || []
+      
       res.status(404).json({
         message: `User with email ${email} not found`,
+        availableUsers: allEmails,
+        hint: "Try registering again or check the email you used",
       })
       return
     }

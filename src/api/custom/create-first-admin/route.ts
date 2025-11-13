@@ -141,8 +141,8 @@ export async function POST(
       )
       
       if (createdAuthIdentity) {
-        console.log(`✅ Verified auth identity exists:`, createdAuthIdentity.id)
-        console.log(`   Entity ID:`, createdAuthIdentity.entity_id)
+        console.log(`✅ Verified auth identity exists:`, (createdAuthIdentity as any).id)
+        console.log(`   Entity ID:`, (createdAuthIdentity as any).entity_id)
         console.log(`   Auth identity data:`, JSON.stringify(createdAuthIdentity, null, 2))
         
         // Try to get provider identity details through query

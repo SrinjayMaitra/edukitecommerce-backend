@@ -116,18 +116,42 @@ export async function POST(
     // IMPORTANT: Store password in PLAIN TEXT
     // Medusa's emailpass provider will hash it automatically during authentication
     // If we hash it ourselves, Medusa will hash it again, causing a mismatch
-    await (authModule.createAuthIdentities as any)([
-      {
-        entity_id: users[0].id,
-        provider: "emailpass",
-        provider_metadata: {
-          password: password, // Plain text - Medusa hashes it during auth
+    console.log(`🔐 Creating auth identity for user ${users[0].id} with password: ${password}`)
+    
+    let authIdentityResult
+    try {
+      authIdentityResult = await (authModule.createAuthIdentities as any)([
+        {
+          entity_id: users[0].id,
+          provider: "emailpass",
+          provider_metadata: {
+            password: password, // Plain text - Medusa hashes it during auth
+          },
+          user_metadata: {
+            is_admin: true,
+          },
         },
-        user_metadata: {
-          is_admin: true,
-        },
-      },
-    ])
+      ])
+      console.log(`✅ Auth identity created:`, JSON.stringify(authIdentityResult, null, 2))
+      
+      // Verify auth identity was created by querying it back
+      const allAuthIdentities = await authModule.listAuthIdentities({})
+      const createdAuthIdentity = allAuthIdentities?.find(
+        (auth: any) => auth.entity_id === users[0].id && auth.provider === "emailpass"
+      )
+      
+      if (createdAuthIdentity) {
+        console.log(`✅ Verified auth identity exists:`, createdAuthIdentity.id)
+        console.log(`   Provider metadata:`, JSON.stringify(createdAuthIdentity.provider_metadata || createdAuthIdentity.providerMetadata, null, 2))
+      } else {
+        console.error(`❌ Auth identity not found after creation!`)
+      }
+    } catch (authError: any) {
+      console.error(`❌ Error creating auth identity:`, authError)
+      console.error(`   Message:`, authError?.message)
+      console.error(`   Stack:`, authError?.stack)
+      throw authError
+    }
 
     console.log(`✅ Admin user created with password!`)
 

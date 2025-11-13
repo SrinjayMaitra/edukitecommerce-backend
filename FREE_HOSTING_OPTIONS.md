@@ -208,3 +208,6 @@ Invoke-RestMethod -Uri "https://your-service.onrender.com/custom/create-first-ad
 
 Both are excellent choices! The admin login issue was a code problem (password hashing), not a hosting problem.
 
+
+
+

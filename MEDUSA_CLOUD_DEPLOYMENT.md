@@ -113,3 +113,6 @@ Check current pricing at: https://medusajs.com/cloud
 - **Medusa Discord**: For community support
 - **Medusa Support**: For Cloud-specific issues
 
+
+
+

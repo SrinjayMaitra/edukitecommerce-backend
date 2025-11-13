@@ -31,20 +31,34 @@ COOKIE_SECRET=your-super-secret-cookie-key-change-this-to-random-string
 ---
 
 ### CORS Configuration
+
+**⚠️ CRITICAL:** These must match your actual frontend URLs exactly!
+
 ```
 STORE_CORS=http://localhost:8000,http://localhost:3000,https://yourdomain.com
 ```
-**Replace with:** Your frontend URLs (comma-separated). Add your production domain when ready.
+**Replace with:** Your store frontend URLs (comma-separated). Add your production domain when ready.
 
 ```
 ADMIN_CORS=http://localhost:5173,http://localhost:9000,https://admin.yourdomain.com
 ```
-**Replace with:** Your admin panel URLs (comma-separated). Add your production admin domain when ready.
+**Replace with:** Your admin panel URLs (comma-separated). **MUST include your production admin frontend URL!**
+
+**Example if admin is on Vercel:**
+```
+ADMIN_CORS=https://edukitecommerce-admin.vercel.app,http://localhost:5173,http://localhost:9000
+```
 
 ```
 AUTH_CORS=http://localhost:5173,http://localhost:9000,https://admin.yourdomain.com
 ```
-**Same as ADMIN_CORS** - URLs where authentication requests can come from.
+**Same as ADMIN_CORS** - URLs where authentication requests can come from. **Must match ADMIN_CORS exactly!**
+
+**⚠️ Common Mistakes:**
+- Forgetting to add production URL to ADMIN_CORS
+- Using `http://` instead of `https://` in production
+- Typos in URLs (extra spaces, wrong domain)
+- AUTH_CORS not matching ADMIN_CORS
 
 ---
 
@@ -66,6 +80,51 @@ ADMIN_PASSWORD=your-secure-password-here
 ADMIN_SETUP_SECRET=supersecret
 ```
 **Optional:** If set, the `/custom/create-first-admin` endpoint will require this secret. Leave empty if you want it fully public (not recommended for production).
+
+---
+
+### ⚠️ CRITICAL: Trust Proxy Headers (Production Fix)
+
+**Required for production deployments behind reverse proxy (Railway, Render, Fly.io):**
+
+```
+TRUST_PROXY=true
+```
+
+**Why this is needed:**
+- Medusa v2.6.0+ requires this to properly handle X-Forwarded headers
+- Without it, cookies won't be set correctly in production
+- Causes 401 Unauthorized errors on `/admin/users/me`
+- See [GitHub Issue #11769](https://github.com/medusajs/medusa/issues/11769) for details
+
+**When to set:**
+- ✅ Always set to `true` in production
+- ✅ Required when using Railway, Render, Fly.io, or any reverse proxy
+- ❌ Not needed for local development
+
+---
+
+### ⚠️ CRITICAL: Admin Frontend Configuration
+
+**If you're using a separate admin frontend (e.g., Vercel/Next.js), you MUST set this in your frontend environment:**
+
+```
+MEDUSA_ADMIN_BACKEND_URL=https://your-backend.onrender.com
+```
+
+**⚠️ IMPORTANT:** 
+- This must point to your **BACKEND API URL** (e.g., `https://your-backend.onrender.com`)
+- **NOT** your admin frontend URL (e.g., `https://admin.vercel.app`)
+- This is a common mistake that causes login failures!
+
+**Where to set:**
+- In your **admin frontend** (Vercel/Next.js) environment variables
+- NOT in your backend environment variables
+
+**Example:**
+- Backend URL: `https://medusa-backend.onrender.com`
+- Admin Frontend URL: `https://admin.vercel.app`
+- Set in **Vercel** (admin frontend): `MEDUSA_ADMIN_BACKEND_URL=https://medusa-backend.onrender.com`
 
 ---
 
@@ -177,4 +236,5 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    Invoke-RestMethod -Uri "https://your-service.onrender.com/custom/create-first-admin" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"email":"admin@medusa.com","password":"your-password"}'
    ```
 5. **Login** at: `https://your-service.onrender.com/app`
+
 

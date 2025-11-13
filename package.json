@@ -29,7 +29,7 @@
     "@medusajs/framework": "2.11.1",
     "@medusajs/icons": "^2.11.1",
     "@medusajs/medusa": "2.11.1",
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3"
   },

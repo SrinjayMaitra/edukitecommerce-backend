@@ -1,6 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
+import pg from "pg"
 
 /**
  * One-time endpoint to create the first admin user
@@ -134,11 +135,23 @@ export async function POST(
       ])
       console.log(`✅ Auth identity created:`, JSON.stringify(authIdentityResult, null, 2))
       
-      // Wait a bit for provider_identity to be created (it might be async)
-      console.log(`⏳ Waiting 3 seconds for provider_identity to be created...`)
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      // Extract auth_identity ID from result
+      const authIdentityId = Array.isArray(authIdentityResult) && authIdentityResult.length > 0 
+        ? authIdentityResult[0].id 
+        : (authIdentityResult as any)?.id
       
-      // Check provider_identity directly (this is what stores the password)
+      if (!authIdentityId) {
+        throw new Error("Could not get auth_identity ID from creation result")
+      }
+      
+      console.log(`📋 Auth identity ID: ${authIdentityId}`)
+      
+      // Wait a bit for provider_identity to be created (it might be async)
+      console.log(`⏳ Waiting 2 seconds for provider_identity to be created...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Check if provider_identity exists
+      let providerIdentityExists = false
       try {
         const providerIdentities = await query.graph({
           entity: "provider_identity",
@@ -150,6 +163,7 @@ export async function POST(
         })
         
         if (providerIdentities?.data && providerIdentities.data.length > 0) {
+          providerIdentityExists = true
           console.log(`✅ Found provider_identity:`, JSON.stringify(providerIdentities.data[0], null, 2))
           const providerMeta = (providerIdentities.data[0] as any).provider_metadata
           if (providerMeta) {
@@ -161,14 +175,97 @@ export async function POST(
           } else {
             console.error(`   ❌ Provider metadata is null/undefined!`)
           }
-        } else {
-          console.error(`❌ Provider identity not found! This is why login fails!`)
-          console.error(`   Auth identity was created but provider_identity was not created.`)
-          console.error(`   This means the password is not stored anywhere.`)
         }
       } catch (queryError: any) {
         console.error(`❌ Could not query provider_identity:`, queryError?.message)
         console.error(`   Stack:`, queryError?.stack)
+      }
+      
+      // If provider_identity doesn't exist, create it manually
+      if (!providerIdentityExists) {
+        console.log(`🔧 Provider identity not found! Creating it manually...`)
+        
+        try {
+          // Get database connection from DATABASE_URL
+          const databaseUrl = process.env.DATABASE_URL
+          if (!databaseUrl) {
+            throw new Error("DATABASE_URL environment variable is not set")
+          }
+          
+          const client = new pg.Client({ connectionString: databaseUrl })
+          await client.connect()
+          
+          // Generate provider_identity ID (Medusa format: providerid_ + random string)
+          const providerId = `providerid_${Math.random().toString(36).substring(2, 22)}`
+          
+          // Create provider_identity with password in provider_metadata
+          const insertQuery = `
+            INSERT INTO provider_identity (
+              id,
+              auth_identity_id,
+              entity_id,
+              provider,
+              provider_metadata,
+              user_metadata,
+              created_at,
+              updated_at
+            ) VALUES (
+              $1,  -- id
+              $2,  -- auth_identity_id
+              $3,  -- entity_id
+              $4,  -- provider
+              $5::jsonb,  -- provider_metadata (with password)
+              $6::jsonb,  -- user_metadata
+              NOW(),
+              NOW()
+            )
+            ON CONFLICT (id) DO NOTHING
+          `
+          
+          const providerMetadata = {
+            password: password  // Plain text - Medusa will hash it during auth
+          }
+          
+          const userMetadata = {
+            is_admin: true
+          }
+          
+          await client.query(insertQuery, [
+            providerId,
+            authIdentityId,
+            users[0].id,
+            "emailpass",
+            JSON.stringify(providerMetadata),
+            JSON.stringify(userMetadata)
+          ])
+          
+          await client.end()
+          
+          console.log(`✅ Manually created provider_identity: ${providerId}`)
+          console.log(`   Password stored in provider_metadata`)
+          
+          // Verify it was created
+          const verifyResult = await query.graph({
+            entity: "provider_identity",
+            fields: ["id", "provider", "provider_metadata", "entity_id", "auth_identity_id"],
+            filters: {
+              id: providerId,
+            },
+          })
+          
+          if (verifyResult?.data && verifyResult.data.length > 0) {
+            console.log(`✅ Verified provider_identity exists:`, JSON.stringify(verifyResult.data[0], null, 2))
+          } else {
+            console.error(`❌ Provider identity not found after manual creation!`)
+          }
+        } catch (dbError: any) {
+          console.error(`❌ Error manually creating provider_identity:`, dbError)
+          console.error(`   Message:`, dbError?.message)
+          console.error(`   Stack:`, dbError?.stack)
+          // Don't throw - continue anyway
+        }
+      } else {
+        console.log(`✅ Provider identity already exists, no manual creation needed`)
       }
       
       // Also verify auth identity was created

@@ -1,7 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import https from "https"
-import http from "http"
+import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
+import pg from "pg"
 
 /**
  * One-time endpoint to create the first admin user
@@ -77,109 +77,149 @@ export async function POST(
       }
     }
 
-    console.log(`🔐 Using Medusa's register endpoint to properly set up authentication...`)
-    
-    // Use Medusa's built-in register endpoint which properly creates BOTH user AND auth
-    // Construct the URL from the request
-    const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')
-    const host = req.headers.host || req.headers['x-forwarded-host'] || 'localhost:9000'
-    const baseUrl = `${protocol}://${host}`
-    
-    let users: any[]
+    // Create admin user using workflow
+    const { result: users } = await createUsersWorkflow(req.scope).run({
+      input: {
+        users: [
+          {
+            email,
+          },
+        ],
+      },
+    })
+
+    // Mark user as admin
+    await userModule.updateUsers({
+      id: users[0].id,
+      metadata: {
+        is_admin: true,
+      },
+    })
+
+    // Delete existing auth identity if it exists
     try {
-      const registerUrl = `${baseUrl}/auth/user/emailpass/register`
-      console.log(`📡 Calling register endpoint: ${registerUrl}`)
-      
-      // Use Node's http/https modules instead of fetch
-      const registerData = await new Promise<any>((resolve, reject) => {
-        const url = new URL(registerUrl)
-        const isHttps = url.protocol === 'https:'
-        const client = isHttps ? https : http
-        
-        const postData = JSON.stringify({ email, password })
-        
-        const options = {
-          hostname: url.hostname,
-          port: url.port || (isHttps ? 443 : 80),
-          path: url.pathname,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData)
-          }
+      const allAuthIdentities = await authModule.listAuthIdentities({})
+      if (allAuthIdentities && allAuthIdentities.length > 0) {
+        const userAuthIdentity = allAuthIdentities.find(
+          (auth: any) => auth.entity_id === users[0].id
+        )
+        if (userAuthIdentity) {
+          await authModule.deleteAuthIdentities([userAuthIdentity.id])
+          console.log("Deleted existing auth identity")
         }
-        
-        const httpReq = client.request(options, (res) => {
-          let data = ''
-          res.on('data', (chunk) => { data += chunk })
-          res.on('end', () => {
-            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-              try {
-                resolve(JSON.parse(data))
-              } catch (e) {
-                reject(new Error(`Failed to parse response: ${data}`))
-              }
-            } else {
-              reject(new Error(`Register failed: ${res.statusCode} - ${data}`))
-            }
-          })
-        })
-        
-        httpReq.on('error', (e) => {
-          reject(new Error(`Request failed: ${e.message}`))
-        })
-        
-        httpReq.write(postData)
-        httpReq.end()
-      })
-      console.log(`✅ Registration successful! Token:`, registerData.token?.substring(0, 20) + '...')
-      
-      // Get the newly created user
-      const allUsers = await query.graph({
-        entity: "user",
-        fields: ["id", "email"],
-        filters: {
-          email: email,
-        },
-      })
-      
-      if (!allUsers?.data || allUsers.data.length === 0) {
-        throw new Error("User not found after registration")
       }
-      
-      users = allUsers.data
-      console.log(`📋 User ID: ${users[0].id}`)
-      
-      // Mark user as admin
-      await userModule.updateUsers({
-        id: users[0].id,
-        metadata: {
-          is_admin: true,
-        },
-      })
-      console.log(`✅ User marked as admin`)
-      
-      // Verify provider_identity was created by register endpoint
-      const providerIdentities = await query.graph({
-        entity: "provider_identity",
-        fields: ["id", "provider", "entity_id", "auth_identity_id"],
-        filters: {
+    } catch (error) {
+      console.warn("Could not delete auth identity:", error)
+    }
+
+    console.log(`🔐 Creating auth identity for user ${users[0].id} with password: ${password}`)
+    
+    let authIdentityResult
+    try {
+      authIdentityResult = await (authModule.createAuthIdentities as any)([
+        {
           entity_id: users[0].id,
           provider: "emailpass",
+          provider_metadata: {
+            password: password, // Plain text - Medusa hashes it during auth
+          },
+          user_metadata: {
+            is_admin: true,
+          },
         },
-      })
+      ])
+      console.log(`✅ Auth identity created:`, JSON.stringify(authIdentityResult, null, 2))
       
-      if (providerIdentities?.data && providerIdentities.data.length > 0) {
-        console.log(`✅ Provider identity exists:`, providerIdentities.data[0].id)
-      } else {
-        console.error(`❌ Provider identity not found!`)
+      // Extract auth_identity ID from result
+      const authIdentityId = Array.isArray(authIdentityResult) && authIdentityResult.length > 0 
+        ? authIdentityResult[0].id 
+        : (authIdentityResult as any)?.id
+      
+      if (!authIdentityId) {
+        throw new Error("Could not get auth_identity ID from creation result")
       }
       
-    } catch (registerError: any) {
-      console.error(`❌ Error during registration:`, registerError)
-      console.error(`   Message:`, registerError?.message)
-      console.error(`   Stack:`, registerError?.stack)
-      throw registerError
+      console.log(`📋 Auth identity ID: ${authIdentityId}`)
+      
+      // Wait a bit for provider_identity to be created (it might be async)
+      console.log(`⏳ Waiting 2 seconds for provider_identity to be created...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Check if provider_identity exists
+      let providerIdentityExists = false
+      try {
+        const providerIdentities = await query.graph({
+          entity: "provider_identity",
+          fields: ["id", "provider", "provider_metadata", "entity_id", "auth_identity_id"],
+          filters: {
+            entity_id: users[0].id,
+            provider: "emailpass",
+          },
+        })
+        
+        if (providerIdentities?.data && providerIdentities.data.length > 0) {
+          providerIdentityExists = true
+          console.log(`✅ Found provider_identity:`, JSON.stringify(providerIdentities.data[0], null, 2))
+        }
+      } catch (queryError: any) {
+        console.error(`❌ Could not query provider_identity:`, queryError?.message)
+      }
+      
+      // If provider_identity doesn't exist, create it manually
+      if (!providerIdentityExists) {
+        console.log(`🔧 Provider identity not found! Creating it manually...`)
+        
+        try {
+          const databaseUrl = process.env.DATABASE_URL
+          if (!databaseUrl) {
+            throw new Error("DATABASE_URL environment variable is not set")
+          }
+          
+          const client = new pg.Client({ connectionString: databaseUrl })
+          await client.connect()
+          
+          const providerId = `providerid_${Math.random().toString(36).substring(2, 22)}`
+          
+          console.log(`📝 Storing password as PLAIN TEXT (Medusa hashes during login)`)
+          
+          const insertQuery = `
+            INSERT INTO provider_identity (
+              id,
+              auth_identity_id,
+              entity_id,
+              provider,
+              provider_metadata,
+              user_metadata,
+              created_at,
+              updated_at
+            ) VALUES (
+              $1, $2, $3, $4, $5::jsonb, $6::jsonb, NOW(), NOW()
+            )
+            ON CONFLICT (id) DO NOTHING
+          `
+          
+          await client.query(insertQuery, [
+            providerId,
+            authIdentityId,
+            users[0].id,
+            "emailpass",
+            JSON.stringify({ password: password }),
+            JSON.stringify({ is_admin: true })
+          ])
+          
+          await client.end()
+          
+          console.log(`✅ Manually created provider_identity: ${providerId}`)
+        } catch (dbError: any) {
+          console.error(`❌ Error manually creating provider_identity:`, dbError?.message)
+        }
+      } else {
+        console.log(`✅ Provider identity already exists, no manual creation needed`)
+      }
+      
+    } catch (authError: any) {
+      console.error(`❌ Error creating auth identity:`, authError?.message)
+      throw authError
     }
 
     console.log(`✅ Admin user created with password!`)

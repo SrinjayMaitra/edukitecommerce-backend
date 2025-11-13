@@ -134,7 +134,44 @@ export async function POST(
       ])
       console.log(`✅ Auth identity created:`, JSON.stringify(authIdentityResult, null, 2))
       
-      // Verify auth identity was created by querying it back
+      // Wait a bit for provider_identity to be created (it might be async)
+      console.log(`⏳ Waiting 3 seconds for provider_identity to be created...`)
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      
+      // Check provider_identity directly (this is what stores the password)
+      try {
+        const providerIdentities = await query.graph({
+          entity: "provider_identity",
+          fields: ["id", "provider", "provider_metadata", "entity_id", "auth_identity_id"],
+          filters: {
+            entity_id: users[0].id,
+            provider: "emailpass",
+          },
+        })
+        
+        if (providerIdentities?.data && providerIdentities.data.length > 0) {
+          console.log(`✅ Found provider_identity:`, JSON.stringify(providerIdentities.data[0], null, 2))
+          const providerMeta = (providerIdentities.data[0] as any).provider_metadata
+          if (providerMeta) {
+            console.log(`   ✅ Provider metadata exists!`)
+            console.log(`   Password in metadata:`, providerMeta.password ? `"${providerMeta.password.substring(0, 3)}..."` : "MISSING")
+            if (!providerMeta.password) {
+              console.error(`   ❌ PASSWORD IS MISSING FROM PROVIDER_METADATA!`)
+            }
+          } else {
+            console.error(`   ❌ Provider metadata is null/undefined!`)
+          }
+        } else {
+          console.error(`❌ Provider identity not found! This is why login fails!`)
+          console.error(`   Auth identity was created but provider_identity was not created.`)
+          console.error(`   This means the password is not stored anywhere.`)
+        }
+      } catch (queryError: any) {
+        console.error(`❌ Could not query provider_identity:`, queryError?.message)
+        console.error(`   Stack:`, queryError?.stack)
+      }
+      
+      // Also verify auth identity was created
       const allAuthIdentities = await authModule.listAuthIdentities({})
       const createdAuthIdentity = allAuthIdentities?.find(
         (auth: any) => auth.entity_id === users[0].id
@@ -142,34 +179,6 @@ export async function POST(
       
       if (createdAuthIdentity) {
         console.log(`✅ Verified auth identity exists:`, (createdAuthIdentity as any).id)
-        console.log(`   Entity ID:`, (createdAuthIdentity as any).entity_id)
-        console.log(`   Auth identity data:`, JSON.stringify(createdAuthIdentity, null, 2))
-        
-        // Try to get provider identity details through query
-        try {
-          const providerIdentities = await query.graph({
-            entity: "provider_identity",
-            fields: ["id", "provider", "provider_metadata", "entity_id"],
-            filters: {
-              entity_id: users[0].id,
-              provider: "emailpass",
-            },
-          })
-          
-          if (providerIdentities?.data && providerIdentities.data.length > 0) {
-            console.log(`✅ Found provider_identity:`, JSON.stringify(providerIdentities.data[0], null, 2))
-            const providerMeta = (providerIdentities.data[0] as any).provider_metadata
-            if (providerMeta) {
-              console.log(`   Provider metadata password:`, providerMeta.password ? "EXISTS" : "MISSING")
-            } else {
-              console.error(`   ❌ Provider metadata is null/undefined!`)
-            }
-          } else {
-            console.error(`❌ Provider identity not found!`)
-          }
-        } catch (queryError: any) {
-          console.warn(`Could not query provider_identity:`, queryError?.message)
-        }
       } else {
         console.error(`❌ Auth identity not found after creation!`)
       }

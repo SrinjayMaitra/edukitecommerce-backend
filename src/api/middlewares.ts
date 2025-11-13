@@ -141,12 +141,48 @@ async function ensureAdminUser(
   next()
 }
 
+// Middleware to set cookie after successful auth
+async function setAuthCookie(
+  req: MedusaRequest,
+  res: MedusaResponse,
+  next: MedusaNextFunction
+) {
+  // Only intercept POST /auth/user/emailpass
+  if (req.method === 'POST' && req.path === '/auth/user/emailpass') {
+    // Store original json method
+    const originalJson = res.json.bind(res)
+    
+    // Override json to intercept response
+    res.json = function(body: any) {
+      // If response contains a token, set it as a cookie
+      if (body && body.token) {
+        res.cookie("_medusa_jwt", body.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+          path: '/',
+        })
+      }
+      // Call original json method
+      return originalJson(body)
+    }
+  }
+  
+  next()
+}
+
 export default defineMiddlewares({
   routes: [
     {
       // Run on any request to ensure admin is set up
       matcher: /.*/,
       middlewares: [ensureAdminUser],
+    },
+    {
+      // Intercept auth endpoint to set cookie
+      matcher: /^\/auth\/user\/emailpass$/,
+      middlewares: [setAuthCookie],
     },
   ],
 })

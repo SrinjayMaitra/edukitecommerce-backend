@@ -2,6 +2,7 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { createUsersWorkflow } from "@medusajs/medusa/core-flows"
 import pg from "pg"
+import bcrypt from "bcryptjs"
 
 /**
  * One-time endpoint to create the first admin user
@@ -198,6 +199,11 @@ export async function POST(
           // Generate provider_identity ID (Medusa format: providerid_ + random string)
           const providerId = `providerid_${Math.random().toString(36).substring(2, 22)}`
           
+          // Hash the password before storing (Medusa expects pre-hashed passwords)
+          console.log(`🔐 Hashing password before storing...`)
+          const hashedPassword = await bcrypt.hash(password, 10)
+          console.log(`✅ Password hashed: ${hashedPassword.substring(0, 20)}...`)
+          
           // Create provider_identity with password in provider_metadata
           const insertQuery = `
             INSERT INTO provider_identity (
@@ -214,7 +220,7 @@ export async function POST(
               $2,  -- auth_identity_id
               $3,  -- entity_id
               $4,  -- provider
-              $5::jsonb,  -- provider_metadata (with password)
+              $5::jsonb,  -- provider_metadata (with HASHED password)
               $6::jsonb,  -- user_metadata
               NOW(),
               NOW()
@@ -223,7 +229,7 @@ export async function POST(
           `
           
           const providerMetadata = {
-            password: password  // Plain text - Medusa will hash it during auth
+            password: hashedPassword  // Pre-hashed password for Medusa emailpass provider
           }
           
           const userMetadata = {

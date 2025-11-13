@@ -137,12 +137,39 @@ export async function POST(
       // Verify auth identity was created by querying it back
       const allAuthIdentities = await authModule.listAuthIdentities({})
       const createdAuthIdentity = allAuthIdentities?.find(
-        (auth: any) => auth.entity_id === users[0].id && auth.provider === "emailpass"
+        (auth: any) => auth.entity_id === users[0].id
       )
       
       if (createdAuthIdentity) {
         console.log(`✅ Verified auth identity exists:`, createdAuthIdentity.id)
-        console.log(`   Provider metadata:`, JSON.stringify(createdAuthIdentity.provider_metadata || createdAuthIdentity.providerMetadata, null, 2))
+        console.log(`   Entity ID:`, createdAuthIdentity.entity_id)
+        console.log(`   Auth identity data:`, JSON.stringify(createdAuthIdentity, null, 2))
+        
+        // Try to get provider identity details through query
+        try {
+          const providerIdentities = await query.graph({
+            entity: "provider_identity",
+            fields: ["id", "provider", "provider_metadata", "entity_id"],
+            filters: {
+              entity_id: users[0].id,
+              provider: "emailpass",
+            },
+          })
+          
+          if (providerIdentities?.data && providerIdentities.data.length > 0) {
+            console.log(`✅ Found provider_identity:`, JSON.stringify(providerIdentities.data[0], null, 2))
+            const providerMeta = (providerIdentities.data[0] as any).provider_metadata
+            if (providerMeta) {
+              console.log(`   Provider metadata password:`, providerMeta.password ? "EXISTS" : "MISSING")
+            } else {
+              console.error(`   ❌ Provider metadata is null/undefined!`)
+            }
+          } else {
+            console.error(`❌ Provider identity not found!`)
+          }
+        } catch (queryError: any) {
+          console.warn(`Could not query provider_identity:`, queryError?.message)
+        }
       } else {
         console.error(`❌ Auth identity not found after creation!`)
       }

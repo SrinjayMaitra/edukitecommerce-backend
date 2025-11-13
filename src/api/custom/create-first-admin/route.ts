@@ -1,5 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import https from "https"
+import http from "http"
 
 /**
  * One-time endpoint to create the first admin user
@@ -78,25 +80,58 @@ export async function POST(
     console.log(`🔐 Using Medusa's register endpoint to properly set up authentication...`)
     
     // Use Medusa's built-in register endpoint which properly creates BOTH user AND auth
+    // Construct the URL from the request
+    const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')
+    const host = req.headers.host || req.headers['x-forwarded-host'] || 'localhost:9000'
+    const baseUrl = `${protocol}://${host}`
+    
     let users: any[]
     try {
-      const registerResponse = await fetch(`${process.env.MEDUSA_ADMIN_BACKEND_URL || 'http://localhost:9000'}/auth/user/emailpass/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password
+      const registerUrl = `${baseUrl}/auth/user/emailpass/register`
+      console.log(`📡 Calling register endpoint: ${registerUrl}`)
+      
+      // Use Node's http/https modules instead of fetch
+      const registerData = await new Promise<any>((resolve, reject) => {
+        const url = new URL(registerUrl)
+        const isHttps = url.protocol === 'https:'
+        const client = isHttps ? https : http
+        
+        const postData = JSON.stringify({ email, password })
+        
+        const options = {
+          hostname: url.hostname,
+          port: url.port || (isHttps ? 443 : 80),
+          path: url.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+          }
+        }
+        
+        const httpReq = client.request(options, (res) => {
+          let data = ''
+          res.on('data', (chunk) => { data += chunk })
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              try {
+                resolve(JSON.parse(data))
+              } catch (e) {
+                reject(new Error(`Failed to parse response: ${data}`))
+              }
+            } else {
+              reject(new Error(`Register failed: ${res.statusCode} - ${data}`))
+            }
+          })
         })
+        
+        httpReq.on('error', (e) => {
+          reject(new Error(`Request failed: ${e.message}`))
+        })
+        
+        httpReq.write(postData)
+        httpReq.end()
       })
-      
-      if (!registerResponse.ok) {
-        const errorData = await registerResponse.json().catch(() => ({}))
-        throw new Error(`Register failed: ${JSON.stringify(errorData)}`)
-      }
-      
-      const registerData = await registerResponse.json()
       console.log(`✅ Registration successful! Token:`, registerData.token?.substring(0, 20) + '...')
       
       // Get the newly created user

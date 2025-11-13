@@ -72,30 +72,37 @@ export async function POST(
         }
       )
 
-    if (!token) {
-      res.status(401).json({
-        message: "Authentication failed - no token received",
+      if (!token) {
+        res.status(401).json({
+          message: "Authentication failed - no token received",
+        })
+        return
+      }
+
+      // Set the cookie
+      res.cookie("_medusa_jwt", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
       })
-      return
+
+      // Return the same response as Medusa's endpoint
+      res.json({
+        token: token,
+      })
+    } catch (authError: any) {
+      console.error("Error in custom auth endpoint:", authError)
+      res.status(401).json({
+        message: authError.message || "Authentication failed",
+        error: authError.toString(),
+      })
     }
-
-    // Set the cookie
-    res.cookie("_medusa_jwt", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/',
-    })
-
-    // Return the same response as Medusa's endpoint
-    res.json({
-      token: token,
-    })
   } catch (error: any) {
     console.error("Error in custom auth endpoint:", error)
-    res.status(401).json({
-      message: error.message || "Authentication failed",
+    res.status(500).json({
+      message: error.message || "Failed to process authentication",
       error: error.toString(),
     })
   }

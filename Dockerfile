@@ -4,14 +4,18 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY package-lock.json* ./
 
-# Install dependencies (use npm install since package-lock.json may not exist)
-RUN npm install --omit=dev
+# Install ALL dependencies (including dev dependencies needed for build)
+RUN npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Set NODE_ENV for build
+ENV NODE_ENV=production
+
+# Build the application (needs dev dependencies like ts-node)
 RUN npm run build
 
 # Expose port
